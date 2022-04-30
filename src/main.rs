@@ -1,3 +1,5 @@
+use std::cell::RefCell;
+
 #[derive(Copy, Clone)]
 enum LeptType { 
     LEPT_NULL, 
@@ -24,17 +26,18 @@ enum Status {
     // LEPT_PARSE_MISS_COLON
 }
 
+use std::rc::{Rc};
 struct LeptNode {
     key: String,
     val: LeptValue,
-    next: Box<LeptNode>,
+    next: Link,
 }
-
+type Link = Option<Rc<RefCell<LeptNode>>>;
 struct LeptValue {
     n: f64,
     a: Vec<LeptValue>,
     str: String,
-    // o: Option<Box<LeptNode>>,
+    o: Link,
     // using vector to mimic array 
     // using links list to mimic the key-val pairs
     tag : LeptType
@@ -47,7 +50,8 @@ impl Default for LeptValue {
             tag: LeptType::LEPT_FALSE,
             n: 0.0,
             a: vec![],
-            str: String::new()
+            str: String::new(),
+            o: None
         }
     }
 }
@@ -60,6 +64,7 @@ struct LeptContext{
 }
 
 impl LeptContext {
+    fn hasnext(&self) -> bool {self.ptr < self.chars.len()}
     fn peek(&self) -> char { self.chars[self.ptr] }
     fn peek1(&self) -> char { self.chars[self.ptr + 1] }
     fn peek2(&self) -> char { self.chars[self.ptr + 2] }
@@ -90,22 +95,19 @@ fn ISDIGIT(c: char) -> bool {
     }
 }
 
-
-
-
-fn lept_parse_whitespace(c:& mut LeptContext) {
-    while c.peek() == ' ' || c.peek() == '\t' || c.peek() == '\n' || c.peek() == '\r' { c.forward(); }
+fn lept_parse_whitespace(c:& mut LeptContext)->Status {
+    while c.hasnext() && (c.peek() == ' ' || c.peek() == '\t' || c.peek() == '\n' || c.peek() == '\r') { c.forward(); }
+    Status::LEPT_PARSE_OK
 }
 
 fn lept_parse_string(c:& mut LeptContext, v:&mut LeptValue)->Status {
     c.expect('\"');
-
     let mut buf:String = String::new();
     while (c.peek() != '\"') {
         buf.push(c.peek());
         c.forward();
     }
-    
+    c.expect('\"');
     v.str = buf;
     v.tag = LeptType::LEPT_STRING;
     return Status::LEPT_PARSE_OK;
@@ -137,7 +139,46 @@ fn lept_parse_array(c:& mut LeptContext, v:&mut LeptValue) -> Status {
             _ => return Status::LEFT_PARSE_ERR
         }
     }
+    c.expect(']');
     v.tag = LeptType::LEPT_ARRAY;
+    return Status::LEPT_PARSE_OK;
+}
+
+
+fn lept_parse_object(c:& mut LeptContext, v:&mut LeptValue) -> Status {
+
+    c.expect('{');
+    lept_parse_whitespace(c);
+    if (c.peek() == '}') {
+        // just empty object
+        c.forward();
+        v.tag = LeptType::LEPT_OBJECT;
+        return Status::LEPT_PARSE_OK;
+    }
+    
+    while true {
+        // 1.parse string using api.
+        let mut tmp_str = LeptValue {..Default::default()};
+        let mut tmp_val = LeptValue {..Default::default()};
+        lept_parse_value(c, & mut tmp_str);
+        c.expect(':');
+        // 2.lept_parse_value
+        lept_parse_value(c, & mut tmp_val);
+        // 3. put the above infos into results
+        let new_node = Rc::new(RefCell::new(LeptNode {
+            key: tmp_str.str,
+            val: tmp_val,
+            next: v.o.take()
+        }));
+        v.o = Some(new_node);
+        if (c.peek() == '}') {
+            c.forward();
+            break;
+        } else if (c.peek() == ',') {
+            c.forward();
+        }
+    }
+    v.tag = LeptType::LEPT_OBJECT;
     return Status::LEPT_PARSE_OK;
 }
 
@@ -180,7 +221,7 @@ fn lept_parse_literal(c:& mut LeptContext, v:&mut LeptValue, literal:&str, tag:L
             return Status::LEFT_PARSE_ERR;
         }
     }
-    // TODO: Is is ok if we do not backward
+    // TODO: Is it ok if we do not backward
     v.tag = tag;
     Status::LEPT_PARSE_OK
 }
@@ -206,8 +247,11 @@ fn lept_parse_value(c:& mut LeptContext, v:&mut LeptValue)->Status {
         't' => lept_parse_true(c, v),
         '\"' => lept_parse_string(c, v),
         '[' => lept_parse_array(c, v),
+        '{' => lept_parse_object(c, v),
         _ => lept_parse_number(c, v)
-    }
+    };
+
+    return lept_parse_whitespace(c);
 }
 
 fn lept_parse(v:&mut LeptValue, json:&str) -> Status {
@@ -269,6 +313,16 @@ fn test5() {
     unsafe { test_pass_counter += 1;}
 }
 
+fn test6() {
+    let mut value = LeptValue { ..Default::default() };
+    lept_parse(&mut value, " { \"123\" : [ {\" dick \" : 1234 }] } ");
+    match value.tag {
+        LeptType::LEPT_OBJECT => println!("passed"),
+        _ => panic!("err")
+    }
+    unsafe { test_pass_counter += 1;}
+}
+
 fn main() {
     println!("LeptJson Rust version, Start!");
     test1();
@@ -276,7 +330,6 @@ fn main() {
     test3();
     test4();
     test5();
+    test6();
     unsafe { println!("{} test case passed!", test_pass_counter); }
 }
-
-
