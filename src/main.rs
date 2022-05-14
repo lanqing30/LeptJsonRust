@@ -60,6 +60,7 @@ impl Default for LeptValue {
 
 
 impl LeptValue {
+    // https://stackoverflow.com/questions/55331919/borrowed-refcell-does-not-last-long-enough-when-iterating-over-a-list
     fn GetNode(&self, key:String) -> Link {
         let mut p = match self.o {
             None => None,
