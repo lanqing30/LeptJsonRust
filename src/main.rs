@@ -26,6 +26,7 @@ enum Status {
     // LEPT_PARSE_MISS_COLON
 }
 
+use std::ptr::NonNull;
 use std::rc::{Rc};
 struct LeptNode {
     key: String,
@@ -53,6 +54,32 @@ impl Default for LeptValue {
             str: String::new(),
             o: None
         }
+    }
+}
+
+
+
+impl LeptValue {
+    fn GetNode(&self, key:String) -> Link {
+        let mut p = match self.o {
+            None => None,
+            Some(ref n) => Some(Rc::clone(n)),
+        };
+
+        loop {
+            let node = match p {
+                None => break,
+                Some(ref n) => Rc::clone(n), // Clone the Rc
+            };
+
+            if (node.borrow().key == key) {return Some(node);}
+            p = match node.borrow().next {
+                None => None,
+                Some(ref next) => Some(Rc::clone(next)), //clone the Rc
+            };
+        }
+
+        return None;
     }
 }
 
@@ -323,6 +350,43 @@ fn test6() {
     unsafe { test_pass_counter += 1;}
 }
 
+
+fn test7() {
+    let mut value = LeptValue { ..Default::default() };
+    lept_parse(&mut value, " { \"123\" : \" bullshit \" } ");
+    match value.tag {
+        LeptType::LEPT_OBJECT => println!("passed"),
+        _ => panic!("err")
+    }
+
+    let fetch = value.GetNode(String::from("123"));
+    match fetch {
+        None => println!("None detected"),
+        Some(ref n) => {
+            println!("Some value");
+            // we will get the content of the Node, we know it is a string
+            // let content = &n.borrow().val;
+            // println!("content is {}", content.str);
+            n.borrow_mut().val.str = String::from("234");
+            let content = &n.borrow().val;
+            println!("content is {}", content.str);
+        }
+    }
+    unsafe { test_pass_counter += 1;}
+}
+
+// convert this to String
+fn Stringfy(v:&LeptValue) {
+
+}
+
+// operate key[val]
+// operator array[index]
+
+
+
+
+
 fn main() {
     println!("LeptJson Rust version, Start!");
     test1();
@@ -331,5 +395,6 @@ fn main() {
     test4();
     test5();
     test6();
+    test7();
     unsafe { println!("{} test case passed!", test_pass_counter); }
 }
