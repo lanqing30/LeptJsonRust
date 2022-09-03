@@ -1,3 +1,5 @@
+
+// Section 1: basic headers
 use std::cell::RefCell;
 
 #[derive(Copy, Clone)]
@@ -26,8 +28,10 @@ enum Status {
     // LEPT_PARSE_MISS_COLON
 }
 
+use std::io::LineWriter;
 use std::ptr::NonNull;
 use std::rc::{Rc};
+use std::vec;
 struct LeptNode {
     key: String,
     val: LeptValue,
@@ -57,33 +61,7 @@ impl Default for LeptValue {
     }
 }
 
-
-
-impl LeptValue {
-    // https://stackoverflow.com/questions/55331919/borrowed-refcell-does-not-last-long-enough-when-iterating-over-a-list
-    fn GetNode(&self, key:String) -> Link {
-        let mut p = match self.o {
-            None => None,
-            Some(ref n) => Some(Rc::clone(n)),
-        };
-
-        loop {
-            let node = match p {
-                None => break,
-                Some(ref n) => Rc::clone(n), // Clone the Rc
-            };
-
-            if (node.borrow().key == key) {return Some(node);}
-            p = match node.borrow().next {
-                None => None,
-                Some(ref next) => Some(Rc::clone(next)), //clone the Rc
-            };
-        }
-
-        return None;
-    }
-}
-
+// Section 2: parse the string to leptvalue.
 
 struct LeptContext{
     chars:Vec<char>,
@@ -105,7 +83,6 @@ impl LeptContext {
             self.forward();
         }
     }
-
     fn putc(&mut self, c: char) {
         self.stack.push(c);
     }
@@ -156,7 +133,6 @@ fn lept_parse_null(c:& mut LeptContext, v:&mut LeptValue)->Status {
 
 fn lept_parse_array(c:& mut LeptContext, v:&mut LeptValue) -> Status {
     c.expect('[');
-
     while true {
         let mut buf = LeptValue { ..Default::default() };
         lept_parse_value(c, &mut buf);
@@ -288,8 +264,99 @@ fn lept_parse(v:&mut LeptValue, json:&str) -> Status {
     return lept_parse_value(&mut c, v);
 }
 
-static mut test_pass_counter:i32 = 0;
+// Section 3: Convert To String API
 
+fn lept_array_stringfy(v:&LeptValue) -> String {
+    let dummy = match v.tag {
+        LeptType::LEPT_ARRAY => {},
+        _ => panic!("NOT ARRY")
+    };
+    let mut vector:Vec<String> = Vec::new();
+    let mut header = String::from("[");
+    let mut footer = String::from("]");
+    let sz = v.a.len();
+    for i in 0..sz {
+        let elem = &v.a[i];
+        vector.push(lept_stringfy(elem));
+    }
+    let mut middle = vector.join(",");
+    return [header, middle, footer].join("");
+}
+
+fn lept_object_stringfy(v:&LeptValue) -> String {
+    let dummy = match v.tag {
+        LeptType::LEPT_OBJECT => {},
+        _ => panic!("NOT object")
+    };
+    let mut vector:Vec<String> = Vec::new();
+    let header = String::from("{");
+    let fotter = String::from("}");
+
+    // we have to iterative 
+    let mut head = match v.o {
+        None => None,
+        Some(ref n) => Some(Rc::clone(n)),
+    };
+
+    while true {
+        let node = match head {
+            None => break,
+            Some(ref n) => Rc::clone(n), // Clone the Rc
+        };
+        // do something on node.
+        let key = &node.borrow().key;
+        let val = &node.borrow().val;
+        let pair = format!("\"{}\":{}", key, lept_stringfy(val));
+        vector.push(pair);
+        head = match node.borrow().next {
+            None => None,
+            Some(ref next) => Some(Rc::clone(next)), //clone the Rc
+        };
+    }
+    
+    let middle:String = vector.join(",");
+    return [header, middle, fotter].join("");
+
+}
+
+
+
+fn lept_stringfy(v:& LeptValue) -> String {
+    match v.tag {
+        LeptType::LEPT_ARRAY => lept_array_stringfy(v),
+        LeptType::LEPT_FALSE => String::from("false"),
+        LeptType::LEPT_NULL => String::from("null"),
+        LeptType::LEPT_NUMBER => v.n.to_string(),
+        LeptType::LEPT_OBJECT => lept_object_stringfy(v),
+        LeptType::LEPT_TRUE => String::from("true"),
+        LeptType::LEPT_STRING => String::from("string")
+    }
+}
+
+// Section 4: Get Type API
+
+// Section 5: Array Designed API
+
+// Section 5: Object Designed API => core of this implementations.
+
+// insert(k, v), assume it is never in the array, just entail this
+fn InsertOrUpdate(v:&mut LeptValue, key: String, val:&LeptValue) {
+    // check it is a object.
+    let dummy = match v.tag {
+        LeptType::LEPT_OBJECT => {},
+        _ => panic!("NOT object")
+    };
+
+    // 
+
+}
+
+// remove(k)
+
+
+// Unit Test.
+
+static mut test_pass_counter:i32 = 0;
 fn test1() {
     let mut value = LeptValue { ..Default::default() };
     lept_parse(&mut value, "  null");
@@ -330,7 +397,6 @@ fn test4() {
     unsafe { test_pass_counter += 1;}
 }
 
-
 fn test5() {
     let mut value = LeptValue { ..Default::default() };
     lept_parse(&mut value, "  [1231, [null, false], 344] ");
@@ -338,6 +404,9 @@ fn test5() {
         LeptType::LEPT_ARRAY => println!("passed"),
         _ => panic!("err")
     }
+
+    println!("{}", lept_array_stringfy(&value));
+
     unsafe { test_pass_counter += 1;}
 }
 
@@ -348,43 +417,9 @@ fn test6() {
         LeptType::LEPT_OBJECT => println!("passed"),
         _ => panic!("err")
     }
+    println!("{}", lept_object_stringfy(&value));
     unsafe { test_pass_counter += 1;}
 }
-
-
-fn test7() {
-    let mut value = LeptValue { ..Default::default() };
-    lept_parse(&mut value, " { \"123\" : \" bullshit \" } ");
-    match value.tag {
-        LeptType::LEPT_OBJECT => println!("passed"),
-        _ => panic!("err")
-    }
-
-    let fetch = value.GetNode(String::from("123"));
-    match fetch {
-        None => println!("None detected"),
-        Some(ref n) => {
-            println!("Some value");
-            // we will get the content of the Node, we know it is a string
-            // let content = &n.borrow().val;
-            // println!("content is {}", content.str);
-            n.borrow_mut().val.str = String::from("234");
-            let content = &n.borrow().val;
-            println!("content is {}", content.str);
-        }
-    }
-    unsafe { test_pass_counter += 1;}
-}
-
-// convert this to String
-fn Stringfy(v:&LeptValue) {
-
-}
-
-// operate key[val]
-// operator array[index]
-
-
 
 
 
@@ -396,6 +431,41 @@ fn main() {
     test4();
     test5();
     test6();
-    test7();
     unsafe { println!("{} test case passed!", test_pass_counter); }
 }
+
+
+
+// interface: 
+// parse
+
+/*
+parse_from_file
+parse_from_string
+
+LeptValue* v = parse_from_xxx();
+leptvalue convert to string (make it beautify)
+
+
+v->get type
+
+if type == array:
+    vec[value*] = get_all_childeren()
+    get(i)
+    set(i, v*)
+    append(value)
+    remove(i)
+    
+
+if type == obj:
+    vec[value*] = get_all_key()
+    v* = get(key)
+    contains(key)
+    insert(key: v*)
+    set(key, v*)
+    remove(key)
+
+others:
+    not opened.
+
+*/
