@@ -350,19 +350,18 @@ fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
     };
     let cmp_str = String::clone(&key_tar);
 
-    // construct the option of [key_tar:val_tar]
-    let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
-    let pointer = Rc::new(RefCell::new(item));
-    let op = Some(pointer);
-    
-
+ 
     // just need to find the insert position
     let mut record: Option<Rc<RefCell<LeptNode>>> = None;
-    let mut head: Option<Rc<RefCell<LeptNode>>>;
+    let mut head: Option<Rc<RefCell<LeptNode>>> = None;
 
     // head is empty
     match v.o {
         None => {
+            // construct the option of [key_tar:val_tar]
+            let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
+            let pointer = Rc::new(RefCell::new(item));
+            let op = Some(pointer);
             v.o = op;
             return ;
         }
@@ -376,6 +375,7 @@ fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
         let key = &node.borrow().key;
         if key == &cmp_str {
             record = Some(Rc::clone(&node));
+            break;
         }
         match node.borrow().next {
             None => break,
@@ -383,14 +383,18 @@ fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
         };
     }
 
-    match head {
+    match record {
        // insert record is ok
        None => {
-        // record.unwrap().borrow_mut().val = val_tar;
+            // construct the option of [key_tar:val_tar]
+            let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
+            let pointer = Rc::new(RefCell::new(item));
+            let op = Some(pointer);
+            head.unwrap().borrow_mut().next = op;
        }
        // append at the tail
        _ => {
-        head.unwrap().borrow_mut().next = op;
+            record.unwrap().borrow_mut().val = val_tar;
        } 
     }
 
@@ -469,12 +473,12 @@ fn test6() {
     }
 
     let mut child = LeptValue { ..Default::default() };
-    lept_parse(&mut child, " { \"456\" : \"shitter\" } ");
+    lept_parse(&mut child, " { \"4567\" : \"shitter\" } ");
     match child.tag {
         LeptType::LEPT_OBJECT => println!("passed"),
         _ => panic!("err")
     }
-    Insert(&mut value, String::from("child"), child);
+    Insert(&mut value, String::from("123"), child);
     println!("{}", lept_object_stringfy(&value));
     unsafe { test_pass_counter += 1;}
 }
