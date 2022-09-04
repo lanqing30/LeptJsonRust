@@ -37,6 +37,8 @@ struct LeptNode {
     val: LeptValue,
     next: Link,
 }
+
+
 type Link = Option<Rc<RefCell<LeptNode>>>;
 struct LeptValue {
     n: f64,
@@ -339,15 +341,63 @@ fn lept_stringfy(v:& LeptValue) -> String {
 
 // Section 5: Object Designed API => core of this implementations.
 
-// insert(k, v), assume it is never in the array, just entail this
-fn InsertOrUpdate(v:&mut LeptValue, key: String, val:&LeptValue) {
+// insert(k, v)
+fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
     // check it is a object.
     let dummy = match v.tag {
         LeptType::LEPT_OBJECT => {},
         _ => panic!("NOT object")
     };
+    let cmp_str = String::clone(&key_tar);
 
-    // 
+    // construct the option of [key_tar:val_tar]
+    let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
+    let pointer = Rc::new(RefCell::new(item));
+    let op = Some(pointer);
+    
+
+    // just need to find the insert position
+    let mut record: Option<Rc<RefCell<LeptNode>>> = None;
+    let mut head: Option<Rc<RefCell<LeptNode>>>;
+
+    // head is empty
+    match v.o {
+        None => {
+            v.o = op;
+            return ;
+        }
+        Some(ref n) => {head = Some(Rc::clone(n));}
+    };
+
+    // now let's iterate
+    while true {
+        let mut node = Rc::clone(head.as_ref().unwrap());
+        // do something on node.
+        let key = &node.borrow().key;
+        if key == &cmp_str {
+            record = Some(Rc::clone(&node));
+        }
+        match node.borrow().next {
+            None => break,
+            Some(ref next) => head = Some(Rc::clone(next)), //clone the Rc
+        };
+    }
+
+    match head {
+       // insert record is ok
+       None => {
+        // record.unwrap().borrow_mut().val = val_tar;
+       }
+       // append at the tail
+       _ => {
+        head.unwrap().borrow_mut().next = op;
+       } 
+    }
+
+    
+
+    
+
 
 }
 
@@ -417,9 +467,19 @@ fn test6() {
         LeptType::LEPT_OBJECT => println!("passed"),
         _ => panic!("err")
     }
+
+    let mut child = LeptValue { ..Default::default() };
+    lept_parse(&mut child, " { \"456\" : \"shitter\" } ");
+    match child.tag {
+        LeptType::LEPT_OBJECT => println!("passed"),
+        _ => panic!("err")
+    }
+    Insert(&mut value, String::from("child"), child);
     println!("{}", lept_object_stringfy(&value));
     unsafe { test_pass_counter += 1;}
 }
+
+
 
 
 
