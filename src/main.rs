@@ -343,7 +343,7 @@ fn lept_stringfy(v:& LeptValue) -> String {
 
 // insert(k, v)
 fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
-    
+    // https://course.rs/too-many-lists/deque/iterator.html
 }
 
 // remove(k)
