@@ -343,66 +343,7 @@ fn lept_stringfy(v:& LeptValue) -> String {
 
 // insert(k, v)
 fn Insert(v:&mut LeptValue, key_tar: String, val_tar:LeptValue) {
-    // check it is a object.
-    let dummy = match v.tag {
-        LeptType::LEPT_OBJECT => {},
-        _ => panic!("NOT object")
-    };
-    let cmp_str = String::clone(&key_tar);
-
- 
-    // just need to find the insert position
-    let mut record: Option<Rc<RefCell<LeptNode>>> = None;
-    let mut head: Option<Rc<RefCell<LeptNode>>> = None;
-
-    // head is empty
-    match v.o {
-        None => {
-            // construct the option of [key_tar:val_tar]
-            let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
-            let pointer = Rc::new(RefCell::new(item));
-            let op = Some(pointer);
-            v.o = op;
-            return ;
-        }
-        Some(ref n) => {head = Some(Rc::clone(n));}
-    };
-
-    // now let's iterate
-    while true {
-        let mut node = Rc::clone(head.as_ref().unwrap());
-        // do something on node.
-        let key = &node.borrow().key;
-        if key == &cmp_str {
-            record = Some(Rc::clone(&node));
-            break;
-        }
-        match node.borrow().next {
-            None => break,
-            Some(ref next) => head = Some(Rc::clone(next)), //clone the Rc
-        };
-    }
-
-    match record {
-       // insert record is ok
-       None => {
-            // construct the option of [key_tar:val_tar]
-            let mut item:LeptNode = LeptNode{key: key_tar, val: val_tar, next: None};
-            let pointer = Rc::new(RefCell::new(item));
-            let op = Some(pointer);
-            head.unwrap().borrow_mut().next = op;
-       }
-       // append at the tail
-       _ => {
-            record.unwrap().borrow_mut().val = val_tar;
-       } 
-    }
-
     
-
-    
-
-
 }
 
 // remove(k)
